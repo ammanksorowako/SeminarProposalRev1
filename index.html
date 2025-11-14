@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Penilaian Seminar Proposal KTI</title>
+    <!-- Memuat Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style untuk radio button kustom */
+        .score-radio {
+            display: none;
+        }
+        .score-label {
+            border: 2px solid #e2e8f0;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            font-weight: 600;
+        }
+        .score-radio:checked + .score-label {
+            border-color: #2563eb;
+            background-color: #dbeafe;
+            color: #1e40af;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Style khusus untuk tombol 'Ditolak' saat dicentang */
+        #keputusan_4:checked + label[for="keputusan_4"] {
+            border-color: #dc2626 !important; /* red-600 */
+            background-color: #fee2e2 !important; /* red-100 */
+            color: #991b1b !important; /* red-900 */
+        }
+        
+        .score-label:hover {
+            background-color: #f8fafc;
+        }
+        /* Style untuk modal */
+        dialog[open] {
+            animation: fadeIn 0.3s ease-out;
+        }
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-lg">
+        
+        <!-- HEADER -->
+        <div class="mb-6 pb-4 border-b border-gray-200">
+            <h1 class="text-3xl font-bold text-gray-900">Formulir Penilaian Seminar Proposal KTI</h1>
+            <p class="text-gray-600 mt-1">Aplikasi untuk menghitung dan menyimpan nilai proposal KTI secara otomatis.</p>
+        </div>
+
+        <!-- BAGIAN SETUP KONEKSI GOOGLE SHEET -->
+        <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">
+            <h2 class="text-lg font-semibold text-blue-800 mb-2">Setup Koneksi Google Sheet (Hanya 1x)</h2>
+            <p class="text-sm text-blue-700 mb-3">Untuk menyimpan data, harap konfigurasikan URL Google Apps Script Anda. Klik tombol "Petunjuk Setup" untuk panduan lengkap.</p>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <input type="password" id="scriptUrl" placeholder="Tempelkan URL Web App dari Google Apps Script di sini" class="flex-grow w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="saveUrlButton" class="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    Simpan URL
+                </button>
+                <button id="openSetupButton" class="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors">
+                    Petunjuk Setup
+                </button>
+            </div>
+            <p id="setupStatus" class="text-sm mt-2"></p>
+        </div>
+
+        <!-- FORMULIR PENILAIAN -->
+        <form id="penilaianForm">
+            
+            <!-- Data Siswa -->
+            <fieldset class="mb-6">
+                <legend class="text-xl font-semibold text-gray-800 mb-4">1. Data Peserta</legend>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="namaSiswa" class="block text-sm font-medium text-gray-700 mb-1">Nama Siswa</label>
+                        <input type="text" id="namaSiswa" name="namaSiswa" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="namaPenguji" class="block text-sm font-medium text-gray-700 mb-1">Nama Penguji</label>
+                        <input type="text" id="namaPenguji" name="namaPenguji" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label for="judulProposal" class="block text-sm font-medium text-gray-700 mb-1">Judul Proposal</label>
+                    <textarea id="judulProposal" name="judulProposal" rows="2" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </fieldset>
+
+            <!-- Aspek Penilaian -->
+            <fieldset class="mb-6">
+                <legend class="text-xl font-semibold text-gray-800 mb-4">2. Aspek Penilaian</legend>
+                
+                <!-- Aspek A -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4 border border-gray-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-gray-900">A. Substansi Proposal (Bobot: 40%)</h3>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-600">Nilai (Bobot x Skor)</span>
+                            <span id="nilai_a" class="text-2xl font-bold text-blue-600 ml-2">0.00</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">Fokus: Kualitas perencanaan penelitian yang tergambar dalam presentasi.</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <!-- Pilihan Skor 1-4 -->
+                        <div>
+                            <input type="radio" id="skor_a_1" name="skor_a" value="1" class="score-radio" required>
+                            <label for="skor_a_1" class="score-label text-center block">1 (Kurang)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_a_2" name="skor_a" value="2" class="score-radio">
+                            <label for="skor_a_2" class="score-label text-center block">2 (Cukup)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_a_3" name="skor_a" value="3" class="score-radio">
+                            <label for="skor_a_3" class="score-label text-center block">3 (Baik)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_a_4" name="skor_a" value="4" class="score-radio">
+                            <label for="skor_a_4" class="score-label text-center block">4 (Sangat Baik)</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Deskriptor -->
+                    <div id="desc_a" class="text-sm text-gray-700 bg-white p-3 rounded-md border border-gray-200 min-h-[50px]">
+                        Pilih skor untuk melihat deskriptor...
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label for="catatan_a" class="block text-sm font-medium text-gray-700 mb-1">Catatan Penguji (Aspek A):</label>
+                        <textarea id="catatan_a" name="catatan_a" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Opsional..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Aspek B -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4 border border-gray-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-gray-900">B. Keterampilan Presentasi (Bobot: 25%)</h3>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-600">Nilai (Bobot x Skor)</span>
+                            <span id="nilai_b" class="text-2xl font-bold text-blue-600 ml-2">0.00</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">Fokus: Cara penyampaian ide dalam 10 menit.</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <!-- Pilihan Skor 1-4 -->
+                        <div>
+                            <input type="radio" id="skor_b_1" name="skor_b" value="1" class="score-radio" required>
+                            <label for="skor_b_1" class="score-label text-center block">1 (Kurang)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_b_2" name="skor_b" value="2" class="score-radio">
+                            <label for="skor_b_2" class="score-label text-center block">2 (Cukup)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_b_3" name="skor_b" value="3" class="score-radio">
+                            <label for="skor_b_3" class="score-label text-center block">3 (Baik)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_b_4" name="skor_b" value="4" class="score-radio">
+                            <label for="skor_b_4" class="score-label text-center block">4 (Sangat Baik)</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Deskriptor -->
+                    <div id="desc_b" class="text-sm text-gray-700 bg-white p-3 rounded-md border border-gray-200 min-h-[50px]">
+                        Pilih skor untuk melihat deskriptor...
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="catatan_b" class="block text-sm font-medium text-gray-700 mb-1">Catatan Penguji (Aspek B):</label>
+                        <textarea id="catatan_b" name="catatan_b" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Opsional..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Aspek C -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4 border border-gray-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-gray-900">C. Penguasaan Materi & Diskusi (Bobot: 35%)</h3>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-600">Nilai (Bobot x Skor)</span>
+                            <span id="nilai_c" class="text-2xl font-bold text-blue-600 ml-2">0.00</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">Fokus: Kualitas jawaban dan sikap selama sesi tanya jawab (20 menit).</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <!-- Pilihan Skor 1-4 -->
+                        <div>
+                            <input type="radio" id="skor_c_1" name="skor_c" value="1" class="score-radio" required>
+                            <label for="skor_c_1" class="score-label text-center block">1 (Kurang)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_c_2" name="skor_c" value="2" class="score-radio">
+                            <label for="skor_c_2" class="score-label text-center block">2 (Cukup)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_c_3" name="skor_c" value="3" class="score-radio">
+                            <label for="skor_c_3" class="score-label text-center block">3 (Baik)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="skor_c_4" name="skor_c" value="4" class="score-radio">
+                            <label for="skor_c_4" class="score-label text-center block">4 (Sangat Baik)</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Deskriptor -->
+                    <div id="desc_c" class="text-sm text-gray-700 bg-white p-3 rounded-md border border-gray-200 min-h-[50px]">
+                        Pilih skor untuk melihat deskriptor...
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label for="catatan_c" class="block text-sm font-medium text-gray-700 mb-1">Catatan Penguji (Aspek C):</label>
+                        <textarea id="catatan_c" name="catatan_c" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Opsional..."></textarea>
+                    </div>
+                </div>
+
+            </fieldset>
+
+            <!-- Umpan Balik Kualitatif -->
+            <fieldset class="mb-6">
+                <legend class="text-xl font-semibold text-gray-800 mb-4">3. Umpan Balik Kualitatif (Wajib Diisi)</legend>
+                <div class="mb-4">
+                    <label for="kekuatan" class="block text-sm font-medium text-gray-700 mb-1">Kekuatan Utama Proposal/Presentasi</label>
+                    <textarea id="kekuatan" name="kekuatan" rows="3" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label for="perbaikan" class="block text-sm font-medium text-gray-700 mb-1">Area Perbaikan Utama (Saran untuk Penelitian)</label>
+                    <textarea id="perbaikan" name="perbaikan" rows="3" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+            </fieldset>
+
+            <!-- Keputusan -->
+            <fieldset class="mb-6">
+                <legend class="text-xl font-semibold text-gray-800 mb-4">4. Keputusan</legend>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                        <input type="radio" id="keputusan_1" name="keputusan" value="Diterima tanpa revisi" class="score-radio" required>
+                        <label for="keputusan_1" class="score-label block text-center">Diterima tanpa revisi</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="keputusan_2" name="keputusan" value="Diterima dengan revisi minor" class="score-radio" required>
+                        <label for="keputusan_2" class="score-label block text-center">Diterima revisi minor</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="keputusan_3" name="keputusan" value="Diterima dengan revisi mayor" class="score-radio" required>
+                        <label for="keputusan_3" class="score-label block text-center">Diterima revisi mayor</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="keputusan_4" name="keputusan" value="Ditolak / Ganti Topik" class="score-radio" required>
+                        <label for="keputusan_4" class="score-label block text-center !border-red-400 !text-red-700 hover:!bg-red-50">Ditolak / Ganti Topik</label>
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Total Nilai & Submit -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="flex flex-col md:flex-row justify-between items-center bg-gray-900 text-white p-6 rounded-lg">
+                    <div class="mb-4 md:mb-0">
+                        <span class="text-2xl font-semibold">NILAI AKHIR</span>
+                        <span class="text-lg text-gray-300">(Skala 4.0)</span>
+                    </div>
+                    <div id="nilai_akhir" class="text-6xl font-bold">0.00</div>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <button type="submit" id="submitButton" class="w-full md:w-1/2 px-8 py-4 bg-green-600 text-white text-lg font-bold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400">
+                        Simpan Penilaian
+                    </button>
+                    <p id="statusMessage" class="mt-4 text-sm"></p>
+                </div>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- MODAL PETUNJUK SETUP -->
+    <dialog id="setupModal" class="p-0 rounded-xl shadow-xl max-w-3xl w-full m-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-900">Petunjuk Setup Google Apps Script</h2>
+                <button id="closeSetupButton" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            
+            <p class="text-gray-700 mb-4">Ikuti langkah-langkah ini untuk menghubungkan formulir ke Google Sheet Anda. Ini hanya perlu dilakukan <strong>satu kali</strong>.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Kolom Kiri: Instruksi -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2">Langkah-langkah:</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                        <li>Buka Google Sheet Anda di link: <br><a href="https://docs.google.com/spreadsheets/d/1YpDDRkU5wLUvBhX_t2ApQX8EYGkJ0--seCOCcdq1a4g/edit" target="_blank" class="text-blue-600 underline">Link Spreadsheet Anda</a></li>
+                        <li>Klik <strong>Extensions</strong> (Ekstensi) &rarr; <strong>Apps Script</strong>.</li>
+                        <li>Hapus semua kode contoh di file `Code.gs`.</li>
+                        <li>Salin dan tempel (paste) kode dari kotak di sebelah kanan ke dalam editor Apps Script.</li>
+                        <li>Klik ikon <strong>Simpan</strong> (Save).</li>
+                        <li>Klik tombol <strong>Deploy</strong> (Terapkan) &rarr; <strong>New deployment</strong> (Penerapan baru).</li>
+                        <li>Klik ikon <strong>Gigi Roda</strong> (di sebelah "Select type"), lalu pilih <strong>Web app</strong>.</li>
+                        <li>Pada bagian "Who has access", pilih <strong>Anyone</strong> (Siapa saja). <strong class="text-red-600">PENTING!</strong></li>
+                        <li>Klik tombol <strong>Deploy</strong> (Terapkan).</li>
+                        <li>Izinkan (authorize) skrip jika diminta.</li>
+                        <li>Salin (copy) <strong>Web app URL</strong> yang ditampilkan.</li>
+                        <li>Tutup modal ini, lalu tempel (paste) URL tersebut ke kolom "Apps Script URL" dan klik "Simpan URL".</li>
+                    </ol>
+                </div>
+
+                <!-- Kolom Kanan: Kode Apps Script -->
+                <div class="bg-gray-900 text-white p-4 rounded-lg">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-semibold text-gray-300">Code.gs</span>
+                        <button id="copyCodeButton" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">Salin Kode</button>
+                    </div>
+                    <pre id="appsScriptCode" class="text-xs overflow-x-auto"><code>// 1. Tentukan URL Spreadsheet Anda
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/1YpDDRkU5wLUvBhX_t2ApQX8EYGkJ0--seCOCcdq1a4g/edit";
+
+// 2. Tentukan nama sheet (tab) di dalam Spreadsheet
+const SHEET_NAME = "Sheet1"; // Ganti jika nama sheet Anda berbeda
+
+// 3. Tentukan urutan header. Ini HARUS sesuai dengan data yang dikirim.
+const HEADERS = [
+  "timestamp",
+  "namaSiswa",
+  "judulProposal",
+  "namaPenguji",
+  "skor_a",
+  "catatan_a",
+  "skor_b",
+  "catatan_b",
+  "skor_c",
+  "catatan_c",
+  "nilai_a",
+  "nilai_b",
+  "nilai_c",
+  "nilai_akhir",
+  "kekuatan",
+  "perbaikan",
+  "keputusan"
+];
+
+function doPost(e) {
+  try {
+    const sheet = SpreadsheetApp.openByUrl(SHEET_URL).getSheetByName(SHEET_NAME);
+    
+    // Buat header jika sheet masih kosong
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(HEADERS);
+    }
+    
+    // Parse data JSON yang dikirim dari formulir
+    const data = JSON.parse(e.postData.contents);
+    
+    // Buat baris baru berdasarkan urutan HEADERS
+    const newRow = HEADERS.map(header => {
+      if (header === "timestamp") {
+        return new Date();
+      }
+      return data[header] || ""; // Beri string kosong jika data tidak ada
+    });
+    
+    // Tambahkan baris baru ke sheet
+    sheet.appendRow(newRow);
+    
+    // Kirim respon sukses kembali ke formulir
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "success", message: "Data berhasil disimpan!" }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader('Access-Control-Allow-Origin', '*');
+      
+  } catch (error) {
+    // Kirim respon error kembali ke formulir
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: error.message }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader('Access-Control-Allow-Origin', '*');
+  }
+}
+
+// --- FUNGSI BARU DITAMBAHKAN UNTUK MENANGANI CORS ---
+function doOptions(e) {
+  return ContentService
+    .createTextOutput()
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader('Access-Control-Allow-Origin', '*') // Izinkan semua origin
+    .setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS') // Izinkan metode POST & OPTIONS
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type'); // Izinkan header Content-Type
+}
+</code></pre>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- VARIABEL ---
+            const form = document.getElementById('penilaianForm');
+            const submitButton = document.getElementById('submitButton');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            // Elemen Setup URL
+            const scriptUrlInput = document.getElementById('scriptUrl');
+            const saveUrlButton = document.getElementById('saveUrlButton');
+            const setupStatus = document.getElementById('setupStatus');
+            
+            // Elemen Modal
+            const setupModal = document.getElementById('setupModal');
+            const openSetupButton = document.getElementById('openSetupButton');
+            const closeSetupButton = document.getElementById('closeSetupButton');
+            const copyCodeButton = document.getElementById('copyCodeButton');
+
+            // Elemen Nilai
+            const nilai_a = document.getElementById('nilai_a');
+            const nilai_b = document.getElementById('nilai_b');
+            const nilai_c = document.getElementById('nilai_c');
+            const nilai_akhir = document.getElementById('nilai_akhir');
+            
+            // Elemen Deskriptor
+            const desc_a = document.getElementById('desc_a');
+            const desc_b = document.getElementById('desc_b');
+            const desc_c = document.getElementById('desc_c');
+
+            // --- DATA DESKRIPTOR (dari DOCX) ---
+            const descriptors = {
+                a: {
+                    1: "Latar belakang tidak relevan. Rumusan masalah tidak jelas. Metodologi tidak sistematis.",
+                    2: "Latar belakang kurang jelas kaitannya. Rumusan masalah terlalu luas. Metodologi kurang rinci.",
+                    3: "Latar belakang jelas, rumusan masalah cukup fokus. Metodologi sudah tepat dan dapat dilaksanakan.",
+                    4: "Latar belakang sangat jelas, rumusan masalah tajam, tujuan spesifik. Metodologi sangat tepat, logis, dan realistis."
+                },
+                b: {
+                    1: "Penyampaian tidak sistematis, sulit dipahami, tidak percaya diri. Media tidak efektif.",
+                    2: "Penyampaian terbata-bata/membaca teks. Media padat teks. Waktu kurang baik.",
+                    3: "Penyampaian cukup runut dan jelas. Media cukup baik. Manajemen waktu baik.",
+                    4: "Sangat runut, jelas, percaya diri. Media sangat efektif (ringkas, visual). Waktu sangat baik."
+                },
+                c: {
+                    1: "Tidak menguasai materi. Tidak mampu menjawab pertanyaan mendasar. Menolak masukan.",
+                    2: "Pemahaman cukup (menghafal). Kesulitan menjawab pertanyaan analitis. Cenderung defensif.",
+                    3: "Pemahaman baik. Mampu menjawab sebagian besar pertanyaan. Terbuka terhadap masukan.",
+                    4: "Pemahaman mendalam (bukan hafalan). Mampu menjawab semua pertanyaan dengan kritis & logis. Sangat terbuka."
+                }
+            };
+
+            // --- FUNGSI ---
+
+            // Fungsi untuk menghitung skor
+            function calculateScores() {
+                const skor_a_val = parseFloat(document.querySelector('input[name="skor_a"]:checked')?.value || 0);
+                const skor_b_val = parseFloat(document.querySelector('input[name="skor_b"]:checked')?.value || 0);
+                const skor_c_val = parseFloat(document.querySelector('input[name="skor_c"]:checked')?.value || 0);
+
+                const val_a = (skor_a_val * 0.40).toFixed(2);
+                const val_b = (skor_b_val * 0.25).toFixed(2);
+                const val_c = (skor_c_val * 0.35).toFixed(2);
+                
+                nilai_a.textContent = val_a;
+                nilai_b.textContent = val_b;
+                nilai_c.textContent = val_c;
+
+                const total = (parseFloat(val_a) + parseFloat(val_b) + parseFloat(val_c)).toFixed(2);
+                nilai_akhir.textContent = total;
+                
+                // Update deskriptor
+                desc_a.textContent = skor_a_val ? descriptors.a[skor_a_val] : "Pilih skor untuk melihat deskriptor...";
+                desc_b.textContent = skor_b_val ? descriptors.b[skor_b_val] : "Pilih skor untuk melihat deskriptor...";
+                desc_c.textContent = skor_c_val ? descriptors.c[skor_c_val] : "Pilih skor untuk melihat deskriptor...";
+            }
+
+            // Fungsi untuk memuat URL dari localStorage
+            function loadUrlFromStorage() {
+                const savedUrl = localStorage.getItem('appsScriptUrl');
+                if (savedUrl) {
+                    scriptUrlInput.value = savedUrl;
+                    setupStatus.textContent = 'URL telah dimuat dari penyimpanan lokal.';
+                    setupStatus.className = 'text-sm mt-2 text-green-700';
+                } else {
+                    setupStatus.textContent = 'Harap konfigurasikan URL Apps Script Anda.';
+                    setupStatus.className = 'text-sm mt-2 text-red-700';
+                }
+            }
+
+            // Fungsi untuk menyimpan URL ke localStorage
+            function saveUrlToStorage() {
+                const url = scriptUrlInput.value;
+                if (url && url.startsWith('https://script.google.com/')) {
+                    localStorage.setItem('appsScriptUrl', url);
+                    setupStatus.textContent = 'URL berhasil disimpan!';
+                    setupStatus.className = 'text-sm mt-2 text-green-700';
+                } else {
+                    setupStatus.textContent = 'URL tidak valid. Harap periksa kembali.';
+                    setupStatus.className = 'text-sm mt-2 text-red-700';
+                }
+            }
+            
+            // Fungsi untuk menyalin kode Apps Script
+            function copyCode() {
+                const codeToCopy = document.getElementById('appsScriptCode').querySelector('code').textContent;
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = codeToCopy;
+                tempTextArea.style.position = 'fixed';
+                tempTextArea.style.top = '-9999px';
+                tempTextArea.style.left = '-9999px';
+                document.body.appendChild(tempTextArea);
+
+                try {
+                    tempTextArea.focus();
+                    tempTextArea.select();
+                    tempTextArea.setSelectionRange(0, 99999); 
+                    const successful = document.execCommand('copy');
+                    
+                    if (successful) {
+                        copyCodeButton.textContent = 'Tersalin!';
+                        setTimeout(() => {
+                            copyCodeButton.textContent = 'Salin Kode';
+                        }, 2000);
+                    } else {
+                        console.error('Gagal menyalin kode: execCommand mengembalikan false.');
+                    }
+                } catch (err) {
+                    console.error('Gagal menyalin kode: ', err);
+                } finally {
+                    document.body.removeChild(tempTextArea);
+                }
+            }
+
+            // Fungsi untuk menangani submit formulir
+            async function handleSubmit(e) {
+                e.preventDefault();
+                const url = scriptUrlInput.value;
+
+                if (!url) {
+                    statusMessage.textContent = 'Gagal: URL Google Apps Script belum di-setup. Klik "Petunjuk Setup".';
+                    statusMessage.className = 'mt-4 text-sm text-red-600';
+                    window.scrollTo(0, 0); 
+                    return;
+                }
+
+                submitButton.disabled = true;
+                statusMessage.textContent = 'Mengirim data...';
+                statusMessage.className = 'mt-4 text-sm text-blue-600';
+
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                
+                data.nilai_a = nilai_a.textContent;
+                data.nilai_b = nilai_b.textContent;
+                data.nilai_c = nilai_c.textContent;
+                data.nilai_akhir = nilai_akhir.textContent;
+                
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        // --- PERBAIKAN DI SINI: Menyederhanakan fetch ---
+                        // redirect: 'follow',  // Dihapus
+                        body: JSON.stringify(data),
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        // cache: 'no-cache' // Dihapus
+                    });
+
+                    const result = await response.json(); 
+
+                    if (result.status === "success") {
+                        statusMessage.textContent = 'Sukses! Data penilaian telah tersimpan di Google Sheet.';
+                        statusMessage.className = 'mt-4 text-sm text-green-600';
+                        form.reset(); 
+                        calculateScores(); 
+                        window.scrollTo(0, 0);
+                    } else {
+                        throw new Error(result.message || 'Respon tidak dikenal dari server.');
+                    }
+
+                } catch (error) {
+                    console.error('Error submitting form:', error);
+                    // --- PERBAIKAN DI SINI: Pesan error lebih tegas ---
+                    statusMessage.textContent = `Gagal total: ${error.message}. Ini BUKAN error kode, tapi error JARINGAN/KONFIGURASI. Pastikan 1) URL sudah benar, dan 2) Skrip sudah di-DEPLOY ULANG dengan 'Anyone' (Siapa saja).`;
+                    statusMessage.className = 'mt-4 text-sm text-red-600 font-bold';
+                } finally {
+                    submitButton.disabled = false;
+                }
+            }
+
+            // --- EVENT LISTENERS ---
+            
+            loadUrlFromStorage();
+            form.addEventListener('change', (e) => {
+                if (e.target.type === 'radio' && (e.target.name.startsWith('skor_') || e.target.name === 'keputusan')) {
+                    calculateScores();
+                }
+            });
+            saveUrlButton.addEventListener('click', saveUrlToStorage);
+            form.addEventListener('submit', handleSubmit);
+            openSetupButton.addEventListener('click', () => setupModal.showModal());
+            closeSetupButton.addEventListener('click', () => setupModal.close());
+            copyCodeButton.addEventListener('click', copyCode);
+            calculateScores();
+        });
+    </script>
+</body>
+</html>
